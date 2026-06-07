@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cyan-50: #fdf2f2;
+  --color-cyan-100: #fad5d5;
+  --color-cyan-200: #f0abab;
+  --color-cyan-300: #e48181;
+  --color-cyan-400: #c94b4b;
+  --color-cyan-500: #b83232;
+  --color-cyan-600: #942222;
+  --color-cyan-700: #7a1c1c;
+  --color-cyan-800: #601616;
+  --color-cyan-900: #461010;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
