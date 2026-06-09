@@ -72,47 +72,54 @@ export default function Dashboard() {
   })
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-        <DateRangeFilter onChange={(s, e) => fetchData(s, e)} />
+        <h1 className="text-xl md:text-2xl font-bold text-slate-800">Dashboard</h1>
+        <div className="overflow-x-auto w-full md:w-auto pb-1">
+          <DateRangeFilter onChange={(s, e) => fetchData(s, e)} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map(({ label, value, icon: Icon, color, isCount }) => (
-          <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4">
-            <div className={`w-12 h-12 ${color} rounded-lg flex items-center justify-center`}>
-              <Icon className="w-6 h-6 text-white" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+        {summaryCards.map(({ label, value, icon: Icon, color, isCount }) => {
+          const isNegative = !isCount && Number(value) < 0
+          return (
+            <div key={label} className="bg-white rounded-xl border border-slate-200 p-3 md:p-4 flex items-center gap-3 md:gap-4">
+              <div className={`w-10 h-10 md:w-12 md:h-12 ${color} rounded-lg flex items-center justify-center shrink-0`}>
+                <Icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs md:text-sm text-slate-500 truncate">{label}</p>
+                <p className={`text-base md:text-xl font-bold ${isNegative ? 'text-red-600' : 'text-slate-800'}`}>
+                  {isCount ? value : `₹${Number(value).toLocaleString()}`}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-slate-500">{label}</p>
-              <p className="text-xl font-bold text-slate-800">
-                {isCount ? value : `₹${Number(value).toLocaleString()}`}
-              </p>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <h2 className="font-semibold text-slate-700 mb-4">Revenue Trend</h2>
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(v) => [`₹${v}`, 'Revenue']} />
-                <Bar dataKey="revenue" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="w-full overflow-hidden">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(v) => [`₹${v}`, 'Revenue']} />
+                  <Bar dataKey="revenue" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <p className="text-slate-400 text-sm py-10 text-center">No data for selected period</p>
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <h2 className="font-semibold text-slate-700 mb-4">Projected Net Amount</h2>
           {projData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
@@ -139,10 +146,10 @@ export default function Dashboard() {
       </div>
 
       {data.active_orders?.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <h2 className="font-semibold text-slate-700 mb-4">Active Orders Pipeline</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-slate-200">
                   <th className="text-left pb-2 font-medium text-slate-500">#</th>
@@ -185,7 +192,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-5 h-5 text-blue-500" />
           <h2 className="font-semibold text-slate-700">Recent Activity</h2>

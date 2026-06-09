@@ -68,7 +68,7 @@ class AnalyticsController extends BaseController {
         $stmt->execute($expenseParams);
         $totalExpenses = (float) $stmt->fetch()['total_expenses'];
 
-        $netAmount = max(0, $revenue - $totalExpenses);
+        $netAmount = $revenue - $totalExpenses;
 
         $stmt = $db->prepare(
             "SELECT COALESCE(SUM(oi.sold_price * oi.quantity), 0) AS total_revenue,

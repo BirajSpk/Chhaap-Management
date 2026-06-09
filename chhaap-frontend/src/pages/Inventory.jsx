@@ -41,14 +41,14 @@ export default function Inventory() {
   )
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Inventory</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-slate-800">Inventory</h1>
         <button
           onClick={() => { setEditing(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm font-medium"
         >
-          <Plus className="w-4 h-4" /> Add Product
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Product</span>
         </button>
       </div>
 
@@ -63,51 +63,53 @@ export default function Inventory() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-3 font-medium text-slate-600">Name</th>
-              <th className="text-left px-4 py-3 font-medium text-slate-600">SKU</th>
-              <th className="text-right px-4 py-3 font-medium text-slate-600">Cost Price</th>
-              <th className="text-right px-4 py-3 font-medium text-slate-600">Selling Price</th>
-              <th className="text-center px-4 py-3 font-medium text-slate-600 w-24">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-slate-400">Loading...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-slate-400">
-                <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                {search ? 'No products match your search' : 'No products yet'}
-              </td></tr>
-            ) : filtered.map((p) => (
-              <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-slate-800">{p.name}</td>
-                <td className="px-4 py-3 text-slate-500 font-mono text-xs">{p.sku}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <span className="text-slate-600">
-                      {showCost[p.id] ? `₹${Number(p.cost_price).toLocaleString()}` : '₹***'}
-                    </span>
-                    <button onClick={() => toggleCost(p.id)} className="p-0.5 text-slate-400 hover:text-slate-600">
-                      {showCost[p.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600">₹{Number(p.selling_price).toLocaleString()}</td>
-                <td className="px-4 py-3 text-center">
-                  <button onClick={() => { setEditing(p); setShowModal(true) }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-red-600 hover:bg-red-50 rounded ml-1" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Name</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">SKU</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-600">Cost Price</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-600">Selling Price</th>
+                <th className="text-center px-4 py-3 font-medium text-slate-600 w-20">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={5} className="text-center py-8 text-slate-400">Loading...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-8 text-slate-400">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  {search ? 'No products match your search' : 'No products yet'}
+                </td></tr>
+              ) : filtered.map((p) => (
+                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">{p.name}</td>
+                  <td className="px-4 py-3 text-slate-500 font-mono text-xs hidden sm:table-cell">{p.sku}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-slate-600">
+                        {showCost[p.id] ? `₹${Number(p.cost_price).toLocaleString()}` : '₹***'}
+                      </span>
+                      <button onClick={() => toggleCost(p.id)} className="p-0.5 text-slate-400 hover:text-slate-600">
+                        {showCost[p.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">₹{Number(p.selling_price).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => { setEditing(p); setShowModal(true) }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Edit">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-red-600 hover:bg-red-50 rounded ml-1" title="Delete">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showModal && (
@@ -154,11 +156,11 @@ function ProductModal({ product, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl p-4 md:p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-slate-800 mb-4">{product ? 'Edit Product' : 'Add Product'}</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <Input label="Product Name" value={form.name} onChange={v => setForm({...form, name: v})} required />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Cost Price (₹)" type="number" value={form.cost_price} onChange={v => setForm({...form, cost_price: v})} />
             <Input label="Selling Price (₹)" type="number" value={form.selling_price} onChange={v => setForm({...form, selling_price: v})} />
           </div>

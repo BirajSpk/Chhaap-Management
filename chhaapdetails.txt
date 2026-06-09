@@ -1,0 +1,3 @@
+Db: u164790521_chhaap_mgt
+Db User: u164790521_chhaap_user
+Db pass: ~|B#Z8k18hI

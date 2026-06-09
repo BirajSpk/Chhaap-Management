@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Check, Pencil, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -19,6 +19,18 @@ const STATUS_COLORS = {
   'Delivered': 'bg-green-500',
   'Completed': 'bg-emerald-500',
 }
+
+const STATUS_HEX = {
+  'Confirmed': '#64748b',
+  'Design Done': '#a855f7',
+  'In Printing': '#3b82f6',
+  'Printing Done': '#6366f1',
+  'Delivery in Progress': '#f97316',
+  'Delivered': '#22c55e',
+  'Completed': '#10b981',
+}
+
+const statusHexColor = (s) => STATUS_HEX[s] || '#e2e8f0'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -50,6 +62,7 @@ export default function OrderDetail() {
     try {
       const updated = await ordersApi.updateStatus(id, newStatus)
       setOrder(updated)
+      window.dispatchEvent(new Event('orders-changed'))
       toast.success(`Order moved to "${newStatus}"`)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to update status')
@@ -66,6 +79,7 @@ export default function OrderDetail() {
     try {
       const updated = await ordersApi.updateStatus(id, 'Completed', 'COMPLETE')
       setOrder(updated)
+      window.dispatchEvent(new Event('orders-changed'))
       toast.success('Order completed!')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to complete order')
@@ -78,6 +92,7 @@ export default function OrderDetail() {
     try {
       await ordersApi.delete(id)
       toast.success(`Order #${id} deleted`)
+      window.dispatchEvent(new Event('orders-changed'))
       navigate('/orders')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to delete order')
@@ -93,62 +108,77 @@ export default function OrderDetail() {
   const isOverdue = deadlineDate && !isCompleted && deadlineDate < new Date()
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/orders" className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to="/orders" className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-slate-800">Order #{order.id}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">Order #{order.id}</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {!isCompleted && (
             <>
               <button onClick={() => setShowDelete(true)}
-                className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 font-medium flex items-center gap-1">
-                <Trash2 className="w-4 h-4" /> Delete
+                className="px-2 md:px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 font-medium flex items-center gap-1">
+                <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Delete</span>
               </button>
-              <Link to={`/orders/${id}/edit`} className="px-3 py-2 text-sm text-cyan-600 border border-cyan-300 rounded-lg hover:bg-cyan-50 font-medium flex items-center gap-1">
-                <Pencil className="w-4 h-4" /> Edit
+              <Link to={`/orders/${id}/edit`} className="px-2 md:px-3 py-2 text-sm text-cyan-600 border border-cyan-300 rounded-lg hover:bg-cyan-50 font-medium flex items-center gap-1">
+                <Pencil className="w-4 h-4" /> <span className="hidden sm:inline">Edit</span>
               </Link>
             </>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
         <h2 className="font-semibold text-slate-700 mb-4">Status Pipeline</h2>
-        <div className="flex items-center gap-0">
-          {STATUSES.map((s, i) => {
-            const clickable = !isCompleted && s !== order.status
-            return (
-              <div key={s} className="flex-1 flex flex-col items-center relative">
-                <div className="flex items-center w-full">
-                  <div className={`h-1 flex-1 ${i === 0 ? 'invisible' : i <= currentIdx ? STATUS_COLORS[s] : 'bg-slate-200'}`} />
-                </div>
-                <button type="button"
-                  onClick={() => clickable && handleStatusChange(s)}
-                  disabled={!clickable}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold -mt-4 z-10 transition-all
-                    ${i < currentIdx ? `${STATUS_COLORS[s]} text-white` : 
-                      i === currentIdx ? `${STATUS_COLORS[s]} text-white ring-4 ring-cyan-200` : 
-                      'bg-slate-200 text-slate-500'}
-                    ${clickable ? 'cursor-pointer hover:ring-2 hover:ring-cyan-300' : 'cursor-default'}`}>
-                  {i < currentIdx ? <Check className="w-4 h-4" /> : i + 1}
-                </button>
-                <div className={`text-xs mt-1 text-center font-medium ${i <= currentIdx ? 'text-slate-800' : 'text-slate-400'}`}
-                  style={{ writingMode: 'horizontal-tb' }}>
-                  {s}
-                </div>
-                <div className={`h-1 flex-1 ${i === STATUSES.length - 1 ? 'invisible' : i < currentIdx ? STATUS_COLORS[s] : 'bg-slate-200'}`} />
-              </div>
-            )
-          })}
+        <div className="overflow-x-auto pt-1 pb-2 -mx-4 md:mx-0 px-4 md:px-0">
+          <div className="flex items-start min-w-[640px]">
+            {STATUSES.map((s, i) => {
+              const clickable = !isCompleted && s !== order.status
+              const done = i < currentIdx
+              const active = i === currentIdx
+              return (
+                <Fragment key={s}>
+                  <div className="flex flex-col items-center shrink-0" style={{ width: '72px' }}>
+                    <button type="button"
+                      onClick={() => clickable && handleStatusChange(s)}
+                      disabled={!clickable}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shrink-0
+                        ${done ? `${STATUS_COLORS[s]} text-white` :
+                          active ? `${STATUS_COLORS[s]} text-white ring-4 ring-cyan-200` :
+                          'bg-slate-200 text-slate-500'}
+                        ${clickable ? 'cursor-pointer hover:ring-2 hover:ring-cyan-300' : 'cursor-default'}`}>
+                      {done ? <Check className="w-4 h-4" /> : i + 1}
+                    </button>
+                    <div className={`text-[10px] md:text-xs mt-2 text-center font-medium leading-tight px-1 ${done || active ? 'text-slate-800' : 'text-slate-400'}`}>
+                      {s}
+                    </div>
+                  </div>
+                  {i < STATUSES.length - 1 && (
+                    <div
+                      className="flex-1 h-1 mt-3.5 rounded-full transition-colors"
+                      style={{ backgroundColor: i < currentIdx ? undefined : '#e2e8f0' }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: i < currentIdx ? '100%' : '0%',
+                          backgroundColor: i < currentIdx ? statusHexColor(STATUSES[i]) : 'transparent',
+                        }}
+                      />
+                    </div>
+                  )}
+                </Fragment>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <h2 className="font-semibold text-slate-700 mb-3">Customer Details</h2>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-slate-500">Name</span><span className="font-medium">{order.customer_name}</span></div>
@@ -189,35 +219,36 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <h2 className="font-semibold text-slate-700 mb-3">Order Items</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left pb-2 font-medium text-slate-500">Product</th>
-                <th className="text-center pb-2 font-medium text-slate-500">Qty</th>
-                <th className="text-right pb-2 font-medium text-slate-500">Price</th>
-                <th className="text-right pb-2 font-medium text-slate-500">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items?.map((item) => (
-                <tr key={item.id} className="border-b border-slate-100">
-                  <td className="py-2 font-medium text-slate-700">{item.product_name}</td>
-                  <td className="py-2 text-center text-slate-600">{item.quantity}</td>
-                  <td className="py-2 text-right text-slate-600">₹{Number(item.sold_price).toLocaleString()}</td>
-                  <td className="py-2 text-right font-medium text-slate-700">₹{(Number(item.sold_price) * item.quantity).toLocaleString()}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[300px]">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left pb-2 font-medium text-slate-500">Product</th>
+                  <th className="text-center pb-2 font-medium text-slate-500">Qty</th>
+                  <th className="text-right pb-2 font-medium text-slate-500">Price</th>
+                  <th className="text-right pb-2 font-medium text-slate-500">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {order.items?.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100">
+                    <td className="py-2 font-medium text-slate-700">{item.product_name}</td>
+                    <td className="py-2 text-center text-slate-600">{item.quantity}</td>
+                    <td className="py-2 text-right text-slate-600">₹{Number(item.sold_price).toLocaleString()}</td>
+                    <td className="py-2 text-right font-medium text-slate-700">₹{(Number(item.sold_price) * item.quantity).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Completed confirmation modal */}
       {showCompleteModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => { setShowCompleteModal(false); setCompleteTyped('') }}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl p-4 md:p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-slate-800 mb-2">Complete Order #{order.id}?</h2>
             <p className="text-sm text-slate-600 mb-4">
               Once completed, this order will count toward revenue and cannot be changed.

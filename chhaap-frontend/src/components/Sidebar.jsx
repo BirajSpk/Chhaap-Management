@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Package, ShoppingCart, CreditCard, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, CreditCard, LogOut, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { ordersApi } from '../services/api'
 
@@ -11,13 +11,18 @@ const links = [
   { to: '/expenses', label: 'Expenses', icon: CreditCard },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { logout, user } = useAuth()
   const navigate = useNavigate()
   const [orderCount, setOrderCount] = useState(null)
 
   useEffect(() => {
-    ordersApi.getCount().then((res) => setOrderCount(res.count)).catch(() => {})
+    const fetchCount = () => {
+      ordersApi.getCount().then((res) => setOrderCount(res.count)).catch(() => {})
+    }
+    fetchCount()
+    window.addEventListener('orders-changed', fetchCount)
+    return () => window.removeEventListener('orders-changed', fetchCount)
   }, [])
 
   const handleLogout = () => {
@@ -25,16 +30,19 @@ export default function Sidebar() {
     navigate('/login', { replace: true })
   }
 
-  return (
-    <aside className="w-64 bg-slate-900 text-white flex flex-col shrink-0">
-      <div className="p-5 border-b border-slate-700">
+  const sidebarContent = (
+    <div className="flex flex-col h-full bg-slate-900 text-white">
+      <div className="p-5 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/Chhaap Logo.png" alt="Chhaap Logo" className="w-10 h-10 rounded-lg object-cover" />
+          <img src="/Chhaap-Logo.png" alt="Chhaap Logo" className="w-10 h-10 rounded-lg object-cover" />
           <div>
             <h1 className="text-lg font-bold leading-tight">Chhaap</h1>
             <p className="text-xs text-slate-400">Management</p>
           </div>
         </div>
+        <button onClick={onClose} className="md:hidden p-1 text-slate-400 hover:text-white">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {user && (
@@ -49,6 +57,7 @@ export default function Sidebar() {
             key={to}
             to={to}
             end={to === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
@@ -77,6 +86,25 @@ export default function Sidebar() {
           Logout
         </button>
       </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/40" onClick={onClose} />
+      )}
+
+      {/* Mobile sidebar */}
+      <div className={`md:hidden fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {sidebarContent}
+      </div>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-64 shrink-0">
+        {sidebarContent}
+      </aside>
+    </>
   )
 }

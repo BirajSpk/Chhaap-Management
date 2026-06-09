@@ -289,8 +289,13 @@ class OrderController extends BaseController {
             }
         }
 
-        $stmt = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $stmt->execute([$newStatus, $id]);
+        if ($newStatus === 'Completed') {
+            $stmt = $db->prepare('UPDATE orders SET status = ?, payment_status = ? WHERE id = ?');
+            $stmt->execute([$newStatus, 'Paid', $id]);
+        } else {
+            $stmt = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
+            $stmt->execute([$newStatus, $id]);
+        }
 
         $direction = array_search($newStatus, self::STATUSES) >= array_search($order['status'], self::STATUSES)
             ? 'advanced' : 'moved back';

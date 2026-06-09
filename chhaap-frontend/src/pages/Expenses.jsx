@@ -62,14 +62,16 @@ export default function Expenses() {
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.expense_amount || e.amount), 0)
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-800">Expenses</h1>
-        <DateRangeFilter onChange={(s, e) => fetch(s, e)} />
+        <h1 className="text-xl md:text-2xl font-bold text-slate-800">Expenses</h1>
+        <div className="overflow-x-auto w-full md:w-auto pb-1">
+          <DateRangeFilter onChange={(s, e) => fetch(s, e)} />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <h2 className="font-semibold text-slate-700 mb-4">Log Expense</h2>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -96,12 +98,12 @@ export default function Expenses() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Description (Optional)</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Description</label>
               <textarea
                 value={expenseDescription}
                 onChange={e => setExpenseDescription(e.target.value)}
                 rows={3}
-                placeholder="Additional details about this expense..."
+                placeholder="Additional details..."
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
               />
             </div>
@@ -124,7 +126,7 @@ export default function Expenses() {
           </form>
         </div>
 
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4 md:p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-700">Expense History</h2>
             <div className="text-sm text-slate-500">
@@ -141,14 +143,13 @@ export default function Expenses() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left pb-3 font-medium text-slate-500">Date</th>
                     <th className="text-left pb-3 font-medium text-slate-500">Name</th>
                     <th className="text-left pb-3 font-medium text-slate-500">Description</th>
                     <th className="text-right pb-3 font-medium text-slate-500">Amount</th>
-                    <th className="text-right pb-3 font-medium text-slate-500">Logged At</th>
                     <th className="text-center pb-3 font-medium text-slate-500 w-16">Actions</th>
                   </tr>
                 </thead>
@@ -173,9 +174,6 @@ export default function Expenses() {
                           </button>
                         </td>
                         <td className="py-2.5 text-right font-medium text-red-600">₹{Number(amount).toLocaleString()}</td>
-                        <td className="py-2.5 text-right text-slate-400 text-xs">
-                          {new Date(e.created_at).toLocaleString()}
-                        </td>
                         <td className="py-2.5 text-center">
                           <button onClick={() => setDeleteTarget(e)}
                             className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
@@ -192,10 +190,9 @@ export default function Expenses() {
         </div>
       </div>
 
-      {/* View Details Modal */}
       {viewDetails && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setViewDetails(null)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl p-4 md:p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-slate-800 mb-4">Expense Details</h3>
             <div className="space-y-3 text-sm">
               <div><span className="text-slate-500">Name:</span> <span className="font-medium ml-2">{viewDetails.expense_name || viewDetails.reason}</span></div>

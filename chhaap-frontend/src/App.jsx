@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Sidebar from './components/Sidebar'
 import Login from './pages/Login'
@@ -12,6 +14,7 @@ import Expenses from './pages/Expenses'
 
 function ProtectedLayout() {
   const { isAuthenticated, loading } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   if (loading) {
     return (
@@ -25,8 +28,14 @@ function ProtectedLayout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <main className="flex-1 overflow-auto min-w-0">
+        <div className="md:hidden sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg">
+            <Menu className="w-5 h-5" />
+          </button>
+          <h1 className="text-sm font-bold text-slate-800">Chhaap Management</h1>
+        </div>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventory" element={<Inventory />} />
