@@ -48,21 +48,34 @@ class ProductController extends BaseController {
         }
 
         $db = Database::getInstance();
+
+        // Duplicate name check
+        $stmt = $db->prepare('SELECT id, name, sku, cost_price, selling_price, is_dimension_product, sqft_cost_price, sqft_selling_price FROM products WHERE name = ? LIMIT 1');
+        $stmt->execute([$data['name']]);
+        $existing = $stmt->fetch();
+        if ($existing) {
+            http_response_code(409);
+            return ['error' => 'Product with this name already exists', 'existing' => $existing];
+        }
+
         $sku = $this->generateSku($db);
 
         $stmt = $db->prepare(
-            'INSERT INTO products (name, sku, cost_price, selling_price)
-             VALUES (?, ?, ?, ?)'
+            'INSERT INTO products (name, sku, cost_price, selling_price, is_dimension_product, sqft_cost_price, sqft_selling_price)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $data['name'],
             $sku,
             $data['cost_price'] ?? 0,
             $data['selling_price'] ?? 0,
+            !empty($data['is_dimension_product']) ? 1 : 0,
+            $data['sqft_cost_price'] ?? 0,
+            $data['sqft_selling_price'] ?? 0,
         ]);
 
         $id = $db->lastInsertId();
-        $this->logActivity("Product '{$data['name']}' created (SKU: {$sku})");
+        $this->logActivity("Product '{$data['name']}' created (SKU: {$sku})", 'CREATE');
 
         return $this->getOne($id);
     }
@@ -73,13 +86,16 @@ class ProductController extends BaseController {
 
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            'UPDATE products SET name=?, sku=?, cost_price=?, selling_price=? WHERE id=?'
+            'UPDATE products SET name=?, sku=?, cost_price=?, selling_price=?, is_dimension_product=?, sqft_cost_price=?, sqft_selling_price=? WHERE id=?'
         );
         $stmt->execute([
             $data['name'] ?? $existing['name'],
             $data['sku'] ?? $existing['sku'],
             $data['cost_price'] ?? $existing['cost_price'],
             $data['selling_price'] ?? $existing['selling_price'],
+            isset($data['is_dimension_product']) ? ($data['is_dimension_product'] ? 1 : 0) : $existing['is_dimension_product'],
+            $data['sqft_cost_price'] ?? $existing['sqft_cost_price'],
+            $data['sqft_selling_price'] ?? $existing['sqft_selling_price'],
             $id,
         ]);
 
@@ -93,13 +109,13 @@ class ProductController extends BaseController {
         $stmt = $db->prepare('DELETE FROM products WHERE id = ?');
         $stmt->execute([$id]);
 
-        $this->logActivity("Product '{$product['name']}' deleted");
+        $this->logActivity("Product '{$product['name']}' deleted", 'DELETE');
         return ['message' => 'Product deleted'];
     }
 
-    private function logActivity(string $description): void {
+    private function logActivity(string $description, string $actionType = 'UPDATE'): void {
         $db = Database::getInstance();
-        $stmt = $db->prepare('INSERT INTO activity_log (description) VALUES (?)');
-        $stmt->execute([$description]);
+        $stmt = $db->prepare('INSERT INTO activity_log (description, user_id, action_type, module) VALUES (?, ?, ?, ?)');
+        $stmt->execute([$description, ($_SERVER['USER_ID'] ?? 1), $actionType, 'PRODUCTS']);
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/BaseController.php';
+require_once __DIR__ . '/RevisionController.php';
 
 class OrderController extends BaseController {
     private const STATUSES = [
@@ -11,6 +12,9 @@ class OrderController extends BaseController {
     public function handle(string $method, ?string $id, ?string $action): mixed {
         if ($method === 'PUT' && $id && $action === 'status') {
             return $this->updateStatus($id);
+        }
+        if ($method === 'PUT' && $id && $action === 'defect') {
+            return $this->updateDefect($id);
         }
         if ($method === 'PUT' && $id && !$action) {
             return $this->update($id);
@@ -46,6 +50,7 @@ class OrderController extends BaseController {
         $start = $_GET['start_date'] ?? null;
         $end = $_GET['end_date'] ?? null;
         $deadlineSort = $_GET['deadline_sort'] ?? null;
+        $defective = $_GET['is_defective'] ?? null;
 
         $sql = 'SELECT * FROM orders';
         $conditions = [];
@@ -67,6 +72,10 @@ class OrderController extends BaseController {
             $params[] = $start . ' 00:00:00';
             $params[] = $end . ' 23:59:59';
         }
+        if ($defective !== null && $defective !== '') {
+            $conditions[] = 'is_defective = ?';
+            $params[] = $defective;
+        }
         if ($conditions) {
             $sql .= ' WHERE ' . implode(' AND ', $conditions);
         }
@@ -84,6 +93,7 @@ class OrderController extends BaseController {
         foreach ($orders as &$order) {
             $order['items'] = $this->getItems($order['id']);
         }
+        unset($order);
         return $orders;
     }
 
@@ -126,24 +136,32 @@ class OrderController extends BaseController {
             $totalAmount = 0;
 
             $stmt = $db->prepare(
-                'INSERT INTO orders (customer_name, customer_phone, customer_address, total_amount, payment_status, advance_payment, deadline, notes)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO orders (customer_name, customer_phone, customer_address, customer_id, total_amount, payment_status, advance_payment, deadline, notes, order_source, platform_handle, payment_method, online_amount, cash_amount, is_defective, defect_description)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $stmt->execute([
                 $data['customer_name'],
                 $data['customer_phone'],
                 $data['customer_address'],
+                $data['customer_id'] ?? null,
                 0,
                 $data['payment_status'] ?? 'Pending',
                 $data['advance_payment'] ?? 0,
                 $data['deadline'] ?? null,
                 $data['notes'] ?? null,
+                $data['order_source'] ?? null,
+                $data['platform_handle'] ?? null,
+                $data['payment_method'] ?? null,
+                $data['online_amount'] ?? 0,
+                $data['cash_amount'] ?? 0,
+                $data['is_defective'] ?? 0,
+                $data['defect_description'] ?? null,
             ]);
             $orderId = $db->lastInsertId();
 
             $itemStmt = $db->prepare(
-                'INSERT INTO order_items (order_id, product_id, custom_item_name, quantity, sold_price, cost_price)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO order_items (order_id, product_id, custom_item_name, quantity, sold_price, cost_price, length, breadth, unit)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
 
             foreach ($data['items'] as $item) {
@@ -156,6 +174,9 @@ class OrderController extends BaseController {
                 $customName = $isCustom ? ($item['custom_item_name'] ?? '') : null;
                 $soldPrice = $item['sold_price'] ?? ($isCustom ? 0 : $this->getProductSellingPrice($item['product_id']));
                 $costPrice = $item['cost_price'] ?? ($isCustom ? 0 : $this->getProductCostPrice($item['product_id']));
+                $length = $item['length'] ?? null;
+                $breadth = $item['breadth'] ?? null;
+                $unit = $item['unit'] ?? null;
 
                 if (!$isCustom && empty($productId)) {
                     throw new Exception('Product ID is required for catalog items');
@@ -168,6 +189,9 @@ class OrderController extends BaseController {
                     $item['quantity'],
                     $soldPrice,
                     $costPrice,
+                    $length,
+                    $breadth,
+                    $unit,
                 ]);
                 $totalAmount += $soldPrice * $item['quantity'];
             }
@@ -175,10 +199,16 @@ class OrderController extends BaseController {
             $updateStmt = $db->prepare('UPDATE orders SET total_amount = ? WHERE id = ?');
             $updateStmt->execute([$totalAmount, $orderId]);
 
+            if (!empty($data['customer_id'])) {
+                $this->updateCustomerStats($data['customer_id']);
+            } else {
+                $this->linkOrCreateCustomer($orderId, $data['customer_name'], $data['customer_phone'], $data['customer_address']);
+            }
+
             $db->commit();
 
-            $stmt = $db->prepare('INSERT INTO activity_log (description) VALUES (?)');
-            $stmt->execute(["Order #{$orderId} created for {$data['customer_name']}"]);
+            $stmt = $db->prepare('INSERT INTO activity_log (description, user_id, action_type, module) VALUES (?, ?, ?, ?)');
+            $stmt->execute(["Order #{$orderId} created for {$data['customer_name']}", ($_SERVER['USER_ID'] ?? 1), 'CREATE', 'ORDERS']);
 
             return $this->getOne($orderId);
         } catch (Exception $e) {
@@ -197,20 +227,33 @@ class OrderController extends BaseController {
         }
 
         $db = Database::getInstance();
+
+        // Snapshot old items for revision log
+        $oldOrder = $this->getOne($id);
+        $oldItems = $oldOrder['items'];
+
         $db->beginTransaction();
 
         try {
             $stmt = $db->prepare(
-                'UPDATE orders SET customer_name=?, customer_phone=?, customer_address=?, payment_status=?, advance_payment=?, deadline=?, notes=? WHERE id=?'
+                'UPDATE orders SET customer_name=?, customer_phone=?, customer_address=?, customer_id=?, payment_status=?, advance_payment=?, deadline=?, notes=?, order_source=?, platform_handle=?, payment_method=?, online_amount=?, cash_amount=?, is_defective=?, defect_description=? WHERE id=?'
             );
             $stmt->execute([
                 $data['customer_name'],
                 $data['customer_phone'],
                 $data['customer_address'],
+                $data['customer_id'] ?? $oldOrder['customer_id'],
                 $data['payment_status'] ?? 'Pending',
                 $data['advance_payment'] ?? 0,
                 $data['deadline'] ?? null,
                 $data['notes'] ?? null,
+                $data['order_source'] ?? null,
+                $data['platform_handle'] ?? null,
+                $data['payment_method'] ?? null,
+                $data['online_amount'] ?? 0,
+                $data['cash_amount'] ?? 0,
+                $data['is_defective'] ?? 0,
+                $data['defect_description'] ?? null,
                 $id,
             ]);
 
@@ -219,8 +262,8 @@ class OrderController extends BaseController {
 
             $totalAmount = 0;
             $itemStmt = $db->prepare(
-                'INSERT INTO order_items (order_id, product_id, custom_item_name, quantity, sold_price, cost_price)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO order_items (order_id, product_id, custom_item_name, quantity, sold_price, cost_price, length, breadth, unit)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
 
             foreach ($data['items'] as $item) {
@@ -233,6 +276,9 @@ class OrderController extends BaseController {
                 $customName = $isCustom ? ($item['custom_item_name'] ?? '') : null;
                 $soldPrice = $item['sold_price'] ?? ($isCustom ? 0 : $this->getProductSellingPrice($item['product_id']));
                 $costPrice = $item['cost_price'] ?? ($isCustom ? 0 : $this->getProductCostPrice($item['product_id']));
+                $length = $item['length'] ?? null;
+                $breadth = $item['breadth'] ?? null;
+                $unit = $item['unit'] ?? null;
 
                 if (!$isCustom && empty($productId)) {
                     throw new Exception('Product ID is required for catalog items');
@@ -245,6 +291,9 @@ class OrderController extends BaseController {
                     $item['quantity'],
                     $soldPrice,
                     $costPrice,
+                    $length,
+                    $breadth,
+                    $unit,
                 ]);
                 $totalAmount += $soldPrice * $item['quantity'];
             }
@@ -252,12 +301,26 @@ class OrderController extends BaseController {
             $updateStmt = $db->prepare('UPDATE orders SET total_amount = ? WHERE id = ?');
             $updateStmt->execute([$totalAmount, $id]);
 
+            // Update customer stats if customer_id set
+            if (!empty($data['customer_id'])) {
+                $this->updateCustomerStats($data['customer_id']);
+            } elseif (!empty($oldOrder['customer_id'])) {
+                $this->updateCustomerStats($oldOrder['customer_id']);
+            } else {
+                $this->linkOrCreateCustomer((int)$id, $data['customer_name'], $data['customer_phone'], $data['customer_address']);
+            }
+
             $db->commit();
 
-            $stmt = $db->prepare('INSERT INTO activity_log (description) VALUES (?)');
-            $stmt->execute(["Order #{$id} updated with " . count($data['items']) . " items, total ₹{$totalAmount}"]);
+            // Record revision diff
+            $updatedOrder = $this->getOne($id);
+            $newItems = $updatedOrder['items'];
+            RevisionController::recordRevision((int)$id, $oldItems, $newItems);
 
-            return $this->getOne($id);
+            $stmt = $db->prepare('INSERT INTO activity_log (description, user_id, action_type, module) VALUES (?, ?, ?, ?)');
+            $stmt->execute(["Order #{$id} updated with " . count($data['items']) . " items, total ₹{$totalAmount}", ($_SERVER['USER_ID'] ?? 1), 'UPDATE', 'ORDERS']);
+
+            return $updatedOrder;
         } catch (Exception $e) {
             $db->rollBack();
             throw $e;
@@ -290,8 +353,15 @@ class OrderController extends BaseController {
         }
 
         if ($newStatus === 'Completed') {
-            $stmt = $db->prepare('UPDATE orders SET status = ?, payment_status = ? WHERE id = ?');
-            $stmt->execute([$newStatus, 'Paid', $id]);
+            $paymentMethod = $data['payment_method'] ?? $order['payment_method'] ?? 'QR';
+            $onlineAmount = $data['online_amount'] ?? null;
+            $cashAmount = $data['cash_amount'] ?? null;
+            if ($paymentMethod === 'Hybrid') {
+                $onlineAmount = $onlineAmount ?? 0;
+                $cashAmount = $cashAmount ?? ($order['total_amount'] ?? 0);
+            }
+            $stmt = $db->prepare('UPDATE orders SET status = ?, payment_status = ?, payment_method = ?, online_amount = ?, cash_amount = ? WHERE id = ?');
+            $stmt->execute([$newStatus, 'Paid', $paymentMethod, $onlineAmount, $cashAmount, $id]);
         } else {
             $stmt = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
             $stmt->execute([$newStatus, $id]);
@@ -299,23 +369,85 @@ class OrderController extends BaseController {
 
         $direction = array_search($newStatus, self::STATUSES) >= array_search($order['status'], self::STATUSES)
             ? 'advanced' : 'moved back';
-        $stmt = $db->prepare('INSERT INTO activity_log (description) VALUES (?)');
-        $stmt->execute(["Order #{$id} {$direction} to '{$newStatus}'"]);
+        $stmt = $db->prepare('INSERT INTO activity_log (description, user_id, action_type, module) VALUES (?, ?, ?, ?)');
+        $stmt->execute(["Order #{$id} {$direction} to '{$newStatus}'", ($_SERVER['USER_ID'] ?? 1), 'UPDATE', 'ORDERS']);
 
+        return $this->getOne($id);
+    }
+
+    private function updateDefect(string $id): array {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $db = Database::getInstance();
+        $stmt = $db->prepare('UPDATE orders SET is_defective = ?, defect_description = ? WHERE id = ?');
+        $stmt->execute([
+            $data['is_defective'] ?? 0,
+            $data['defect_description'] ?? null,
+            $id,
+        ]);
+        $stmt = $db->prepare('INSERT INTO activity_log (description, user_id, action_type, module) VALUES (?, ?, ?, ?)');
+        $desc = ($data['is_defective'] ?? 0) ? "Order #{$id} marked as defective" : "Order #{$id} defect flag removed";
+        if (!empty($data['defect_description'])) $desc .= ": {$data['defect_description']}";
+        $stmt->execute([$desc, ($_SERVER['USER_ID'] ?? 1), 'UPDATE', 'ORDERS']);
         return $this->getOne($id);
     }
 
     private function delete(string $id): array {
         $db = Database::getInstance();
         $order = $this->getOne($id);
+        $customerId = $order['customer_id'] ?? null;
 
         $stmt = $db->prepare('DELETE FROM orders WHERE id = ?');
         $stmt->execute([$id]);
 
-        $stmt = $db->prepare('INSERT INTO activity_log (description) VALUES (?)');
-        $stmt->execute(["Order #{$id} ({$order['customer_name']}) deleted"]);
+        $stmt = $db->prepare('INSERT INTO activity_log (description, user_id, action_type, module) VALUES (?, ?, ?, ?)');
+        $stmt->execute(["Order #{$id} ({$order['customer_name']}) deleted", ($_SERVER['USER_ID'] ?? 1), 'DELETE', 'ORDERS']);
+
+        if ($customerId) {
+            $this->updateCustomerStats($customerId);
+        }
 
         return ['message' => 'Order deleted'];
+    }
+
+    private function updateCustomerStats(int $customerId): void {
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE customers c
+             INNER JOIN (
+               SELECT customer_id, COUNT(*) AS cnt, SUM(total_amount) AS rev
+               FROM orders WHERE customer_id = ? AND customer_id IS NOT NULL
+               GROUP BY customer_id
+             ) stats ON c.id = stats.customer_id
+             SET c.total_orders = stats.cnt, c.lifetime_revenue = COALESCE(stats.rev, 0)
+             WHERE c.id = ?'
+        );
+        $stmt->execute([$customerId, $customerId]);
+    }
+
+    private function linkOrCreateCustomer(int $orderId, string $name, string $phone, string $address): void {
+        $db = Database::getInstance();
+
+        // 1. Match by phone first (phone is the unique anchor)
+        $stmt = $db->prepare("SELECT * FROM customers WHERE phone = ? LIMIT 1");
+        $stmt->execute([$phone]);
+        $byPhone = $stmt->fetch();
+
+        if ($byPhone) {
+            // Same phone → same person. Update name/address to latest.
+            $stmt = $db->prepare("UPDATE customers SET name = ?, address = ? WHERE id = ?");
+            $stmt->execute([$name, $address, $byPhone['id']]);
+            $customerId = $byPhone['id'];
+        } else {
+            // New phone → new person (even if name matches someone else)
+            $stmt = $db->prepare('INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)');
+            $stmt->execute([$name, $phone, $address]);
+            $customerId = $db->lastInsertId();
+        }
+
+        $stmt = $db->prepare('UPDATE orders SET customer_id = ? WHERE id = ?');
+        $stmt->execute([$customerId, $orderId]);
+
+        $this->updateCustomerStats($customerId);
     }
 
     private function getProductSellingPrice(int $productId): float {

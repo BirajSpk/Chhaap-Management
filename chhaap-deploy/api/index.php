@@ -19,12 +19,16 @@ $uri = rtrim($uri, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
 $routes = [
-    'auth'      => 'AuthController',
-    'products'  => 'ProductController',
-    'orders'    => 'OrderController',
-    'expenses'  => 'ExpenseController',
-    'analytics' => 'AnalyticsController',
-    'activity'  => 'ActivityController',
+    'auth'       => 'AuthController',
+    'products'   => 'ProductController',
+    'orders'     => 'OrderController',
+    'expenses'   => 'ExpenseController',
+    'analytics'  => 'AnalyticsController',
+    'activity'   => 'ActivityController',
+    'customers'  => 'CustomerController',
+    'revisions'  => 'RevisionController',
+    'quotations' => 'QuotationController',
+    'users'      => 'UsersController',
 ];
 
 $parts = array_values(array_filter(explode('/', $uri), fn($p) => $p !== '' && $p !== 'api'));
@@ -47,8 +51,11 @@ if (!$resource || !isset($routes[$resource])) {
 
 // Public routes (no auth required)
 $publicRoutes = ['auth'];
+$authPayload = null;
 if (!in_array($resource, $publicRoutes)) {
-    AuthMiddleware::check();
+    $authPayload = AuthMiddleware::check();
+    $_SERVER['USER_ID'] = $authPayload['user_id'] ?? 1;
+    $_SERVER['USER_EMAIL'] = $authPayload['email'] ?? '';
 }
 
 $controllerClass = $routes[$resource];

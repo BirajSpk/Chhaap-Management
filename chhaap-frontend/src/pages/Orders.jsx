@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, ShoppingCart, Trash2, ArrowUpDown } from 'lucide-react'
+import { Plus, Search, ShoppingCart, Trash2, ArrowUpDown, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ordersApi } from '../services/api'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
@@ -28,36 +28,38 @@ export default function Orders() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [deadlineSort, setDeadlineSort] = useState('')
+  const [defectiveFilter, setDefectiveFilter] = useState('')
   const debounceRef = useRef(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
-  const buildParams = (searchTerm, status, ds, startDate, endDate) => {
+  const buildParams = (searchTerm, status, ds, startDate, endDate, defective) => {
     const params = {}
     if (searchTerm) params.search = searchTerm
     if (status) params.status = status
     if (ds) params.deadline_sort = ds
     if (startDate && endDate) { params.start_date = startDate; params.end_date = endDate }
+    if (defective) params.is_defective = defective
     return params
   }
 
-  const fetchOrders = useCallback(async (searchTerm, status, ds, startDate, endDate) => {
+  const fetchOrders = useCallback(async (searchTerm, status, ds, startDate, endDate, defective) => {
     setLoading(true)
     try {
-      const data = await ordersApi.list(buildParams(searchTerm, status, ds, startDate, endDate))
+      const data = await ordersApi.list(buildParams(searchTerm, status, ds, startDate, endDate, defective))
       setOrders(data)
     } catch { /* ignore */ }
     finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
-    fetchOrders('', '', '', null, null)
+    fetchOrders('', '', '', null, null, '')
   }, [fetchOrders])
 
   const handleSearch = (value) => {
     setSearch(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      fetchOrders(value, statusFilter, deadlineSort, null, null)
+      fetchOrders(value, statusFilter, deadlineSort, null, null, defectiveFilter)
     }, 300)
   }
 
@@ -68,7 +70,7 @@ export default function Orders() {
       toast.success(`Order #${deleteTarget.id} deleted`)
       setDeleteTarget(null)
       window.dispatchEvent(new Event('orders-changed'))
-      fetchOrders(search, statusFilter, deadlineSort, null, null)
+      fetchOrders(search, statusFilter, deadlineSort, null, null, defectiveFilter)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to delete order')
     }
@@ -97,17 +99,21 @@ export default function Orders() {
             className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
         </div>
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); fetchOrders(search, e.target.value, deadlineSort, null, null) }}
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); fetchOrders(search, e.target.value, deadlineSort, null, null, defectiveFilter) }}
           className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white">
           <option value="">All</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button onClick={() => { const next = deadlineSort === 'asc' ? '' : 'asc'; setDeadlineSort(next); fetchOrders(search, statusFilter, next, null, null) }}
+        <button onClick={() => { const next = deadlineSort === 'asc' ? '' : 'asc'; setDeadlineSort(next); fetchOrders(search, statusFilter, next, null, null, defectiveFilter) }}
           className={`flex items-center gap-1 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${deadlineSort === 'asc' ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
           <ArrowUpDown className="w-4 h-4" /> <span className="hidden sm:inline">Deadline</span>
         </button>
+        <button onClick={() => { const next = defectiveFilter === '1' ? '' : '1'; setDefectiveFilter(next); fetchOrders(search, statusFilter, deadlineSort, null, null, next) }}
+          className={`flex items-center gap-1 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${defectiveFilter === '1' ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}>
+          <AlertTriangle className="w-4 h-4" /> Defective
+        </button>
         <div className="overflow-x-auto w-full md:w-auto pb-1">
-          <DateRangeFilter onChange={(s, e) => fetchOrders(search, statusFilter, deadlineSort, s, e)} />
+          <DateRangeFilter onChange={(s, e) => fetchOrders(search, statusFilter, deadlineSort, s, e, defectiveFilter)} />
         </div>
       </div>
 
@@ -138,10 +144,10 @@ export default function Orders() {
               ) : orders.map((o) => (
                 <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
                   onClick={() => navigate(`/orders/${o.id}`)}>
-                  <td className="px-4 py-3 font-medium text-slate-800">#{o.id}</td>
+                  <td className="px-4 py-3 font-medium text-slate-800">#{o.id}{o.is_defective == 1 && <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium"><AlertTriangle className="w-3 h-3" /> Defective</span>}</td>
                   <td className="px-4 py-3 text-slate-700 truncate max-w-[120px] md:max-w-none">{o.customer_name}</td>
                   <td className="px-4 py-3 text-slate-500 hidden sm:table-cell">{o.customer_phone}</td>
-                  <td className="px-4 py-3 text-right font-medium text-slate-700">₹{Number(o.total_amount).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-medium text-slate-700">रु{Number(o.total_amount).toLocaleString()}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[o.status]}`}>
                       {o.status}
@@ -151,7 +157,7 @@ export default function Orders() {
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       o.payment_status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                     }`}>
-                      {o.payment_status}
+                      {o.payment_status === 'Pending' && Number(o.advance_payment) > 0 && o.status !== 'Completed' ? 'Advance Paid' : o.payment_status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center text-xs hidden md:table-cell">

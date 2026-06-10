@@ -39,6 +39,7 @@ class AuthController extends BaseController {
                 'id' => $user['id'],
                 'name' => $user['name'],
                 'email' => $user['email'],
+                'role' => $user['role'] ?? 'staff',
             ],
         ];
     }
@@ -46,7 +47,7 @@ class AuthController extends BaseController {
     private function verify(): array {
         $payload = AuthMiddleware::check();
         $db = Database::getInstance();
-        $stmt = $db->prepare('SELECT id, name, email FROM users WHERE id = ?');
+        $stmt = $db->prepare('SELECT id, name, email, role FROM users WHERE id = ?');
         $stmt->execute([$payload['user_id']]);
         $user = $stmt->fetch();
 

@@ -41,7 +41,8 @@ export const ordersApi = {
   list: (params) => api.get('/orders', { params }).then(r => r.data),
   get: (id) => api.get(`/orders/${id}`).then(r => r.data),
   create: (data) => api.post('/orders', data).then(r => r.data),
-  updateStatus: (id, status, confirmText) => api.put(`/orders/${id}/status`, { status, confirm_text: confirmText }).then(r => r.data),
+  updateStatus: (id, status, extra = {}) => api.put(`/orders/${id}/status`, { status, ...extra }).then(r => r.data),
+  updateDefect: (id, data) => api.put(`/orders/${id}/defect`, data).then(r => r.data),
   update: (id, data) => api.put(`/orders/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/orders/${id}`).then(r => r.data),
   getCount: () => api.get('/orders/count').then(r => r.data),
@@ -50,6 +51,7 @@ export const ordersApi = {
 export const expensesApi = {
   list: (params) => api.get('/expenses', { params }).then(r => r.data),
   create: (data) => api.post('/expenses', data).then(r => r.data),
+  update: (id, data) => api.put(`/expenses/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/expenses/${id}`).then(r => r.data),
 }
 
@@ -58,7 +60,35 @@ export const analyticsApi = {
 }
 
 export const activityApi = {
-  list: (limit) => api.get('/activity', { params: { limit } }).then(r => r.data),
+  list: (params) => api.get('/activity', { params }).then(r => r.data),
+  clear: (confirm) => api.get('/activity/clear', { params: { confirm } }).then(r => r.data),
 }
 
-export default api
+export const customersApi = {
+  list: () => api.get('/customers').then(r => r.data),
+  get: (id) => api.get(`/customers/${id}`).then(r => r.data),
+  search: (q, field) => api.get('/customers/search', { params: { q, field } }).then(r => r.data),
+  create: (data) => api.post('/customers', data).then(r => r.data),
+  update: (id, data) => api.put(`/customers/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/customers/${id}`).then(r => r.data),
+}
+
+export const revisionsApi = {
+  getByOrder: (orderId) => api.get(`/revisions/${orderId}`).then(r => r.data),
+}
+
+export const quotationsApi = {
+  list: () => api.get('/quotations').then(r => r.data),
+  get: (id) => api.get(`/quotations/${id}`).then(r => r.data),
+  create: (data) => api.post('/quotations', data).then(r => r.data),
+  update: (id, data) => api.put(`/quotations/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/quotations/${id}`).then(r => r.data),
+}
+
+export const usersApi = {
+  list: () => api.get('/users').then(r => r.data),
+  get: (id) => api.get(`/users/${id}`).then(r => r.data),
+  create: (data) => api.post('/users', data).then(r => r.data),
+  update: (id, data) => api.put(`/users/${id}`, data).then(r => r.data),
+  delete: (id) => api.delete(`/users/${id}`).then(r => r.data),
+}

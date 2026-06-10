@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Sidebar from './components/Sidebar'
 import Login from './pages/Login'
@@ -11,6 +11,11 @@ import NewOrder from './pages/NewOrder'
 import OrderDetail from './pages/OrderDetail'
 import EditOrder from './pages/EditOrder'
 import Expenses from './pages/Expenses'
+import Customers from './pages/Customers'
+import KanbanBoard from './pages/KanbanBoard'
+import Calculator from './pages/Calculator'
+import UserManagement from './pages/UserManagement'
+import ActivityLog from './pages/ActivityLog'
 
 function ProtectedLayout() {
   const { isAuthenticated, loading } = useAuth()
@@ -44,6 +49,11 @@ function ProtectedLayout() {
           <Route path="/orders/:id" element={<OrderDetail />} />
           <Route path="/orders/:id/edit" element={<EditOrder />} />
           <Route path="/expenses" element={<Expenses />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/kanban" element={<KanbanBoard />} />
+          <Route path="/calculator" element={<Calculator />} />
+          <Route path="/users" element={<UserManagement />} />
+          <Route path="/activity" element={<ActivityLog />} />
         </Routes>
       </main>
     </div>

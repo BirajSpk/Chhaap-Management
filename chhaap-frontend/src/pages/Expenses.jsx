@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { CreditCard, Trash2, Eye } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { CreditCard, Trash2, Eye, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { expensesApi } from '../services/api'
 import DateRangeFilter from '../components/DateRangeFilter'
@@ -12,9 +12,11 @@ export default function Expenses() {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseDescription, setExpenseDescription] = useState('')
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10))
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [viewDetails, setViewDetails] = useState(null)
+  const [editing, setEditing] = useState(null)
 
   const fetch = async (startDate, endDate) => {
     setLoading(true)
@@ -28,23 +30,50 @@ export default function Expenses() {
 
   useEffect(() => { fetch() }, [])
 
+  const resetForm = () => {
+    setExpenseName('')
+    setExpenseAmount('')
+    setExpenseDescription('')
+    setExpenseDate(new Date().toISOString().slice(0, 10))
+    setPaymentMethod('')
+    setEditing(null)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!expenseAmount || !expenseName) return toast.error('Amount and name required')
     setSubmitting(true)
     try {
-      await expensesApi.create({ expense_amount: expenseAmount, expense_name: expenseName, expense_description: expenseDescription || undefined, expense_date: expenseDate })
-      toast.success('Expense logged')
-      setExpenseAmount('')
-      setExpenseName('')
-      setExpenseDescription('')
-      setExpenseDate(new Date().toISOString().slice(0, 10))
+      const payload = {
+        expense_name: expenseName,
+        expense_amount: expenseAmount,
+        expense_description: expenseDescription || undefined,
+        expense_date: expenseDate,
+        payment_method: paymentMethod || undefined,
+      }
+      if (editing) {
+        await expensesApi.update(editing.id, payload)
+        toast.success('Expense updated')
+      } else {
+        await expensesApi.create(payload)
+        toast.success('Expense logged')
+      }
+      resetForm()
       fetch()
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to log expense')
+      toast.error(err.response?.data?.error || 'Failed')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleEdit = (e) => {
+    setEditing(e)
+    setExpenseName(e.expense_name || e.reason || '')
+    setExpenseAmount(e.expense_amount || e.amount || '')
+    setExpenseDescription(e.expense_description || '')
+    setExpenseDate(e.expense_date || '')
+    setPaymentMethod(e.payment_method || '')
   }
 
   const handleDelete = async () => {
@@ -59,7 +88,7 @@ export default function Expenses() {
     }
   }
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.expense_amount || e.amount), 0)
+  const totalExpenses = useMemo(() => expenses.reduce((sum, e) => sum + Number(e.expense_amount || e.amount), 0), [expenses])
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -72,57 +101,51 @@ export default function Expenses() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5">
-          <h2 className="font-semibold text-slate-700 mb-4">Log Expense</h2>
+          <h2 className="font-semibold text-slate-700 mb-4">{editing ? 'Edit Expense' : 'Log Expense'}</h2>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Expense Name *</label>
-              <input
-                type="text"
-                value={expenseName}
-                onChange={e => setExpenseName(e.target.value)}
-                placeholder="e.g. Stationery, Transport..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                required
-              />
+              <input type="text" value={expenseName} onChange={e => setExpenseName(e.target.value)}
+                placeholder="e.g. Stationery, Transport..." required
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Amount (₹) *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={expenseAmount}
-                onChange={e => setExpenseAmount(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                required
-              />
+              <label className="block text-sm font-medium text-slate-600 mb-1">Amount (रु) *</label>
+              <input type="number" min="0" step="0.01" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} required
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Payment Method</label>
+              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="">Select...</option>
+                <option value="QR">QR (Online)</option>
+                <option value="Physical Cash">Physical Cash</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Description</label>
-              <textarea
-                value={expenseDescription}
-                onChange={e => setExpenseDescription(e.target.value)}
-                rows={3}
+              <textarea value={expenseDescription} onChange={e => setExpenseDescription(e.target.value)} rows={3}
                 placeholder="Additional details..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
-              />
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Date</label>
-              <input
-                type="date"
-                value={expenseDate}
-                onChange={e => setExpenseDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              />
+              <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500" />
             </div>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 text-sm font-medium"
-            >
-              {submitting ? 'Saving...' : 'Log Expense'}
-            </button>
+            <div className="flex gap-2">
+              <button type="submit" disabled={submitting}
+                className="flex-1 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 text-sm font-medium">
+                {submitting ? 'Saving...' : editing ? 'Update Expense' : 'Log Expense'}
+              </button>
+              {editing && (
+                <button type="button" onClick={resetForm}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 text-sm">
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -130,7 +153,7 @@ export default function Expenses() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-700">Expense History</h2>
             <div className="text-sm text-slate-500">
-              Total: <span className="font-bold text-red-600">₹{totalExpenses.toLocaleString()}</span>
+              Total: <span className="font-bold text-red-600">रु{totalExpenses.toLocaleString()}</span>
             </div>
           </div>
 
@@ -143,14 +166,15 @@ export default function Expenses() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[500px]">
+              <table className="w-full text-sm min-w-[580px]">
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left pb-3 font-medium text-slate-500">Date</th>
                     <th className="text-left pb-3 font-medium text-slate-500">Name</th>
+                    <th className="text-left pb-3 font-medium text-slate-500">Method</th>
                     <th className="text-left pb-3 font-medium text-slate-500">Description</th>
                     <th className="text-right pb-3 font-medium text-slate-500">Amount</th>
-                    <th className="text-center pb-3 font-medium text-slate-500 w-16">Actions</th>
+                    <th className="text-center pb-3 font-medium text-slate-500 w-24">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -162,21 +186,26 @@ export default function Expenses() {
                       <tr key={e.id} className="border-b border-slate-100">
                         <td className="py-2.5 text-slate-600">{e.expense_date}</td>
                         <td className="py-2.5 text-slate-700 font-medium">{name}</td>
+                        <td className="py-2.5 text-slate-500 text-xs">
+                          {e.payment_method ? <span className={`px-1.5 py-0.5 rounded font-medium ${
+                            e.payment_method === 'QR' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                          }`}>{e.payment_method}</span> : <span className="text-slate-300">—</span>}
+                        </td>
                         <td className="py-2.5">
                           <button onClick={() => setViewDetails(e)} disabled={!description}
                             className={`text-xs font-medium flex items-center gap-1 px-2 py-1 rounded ${
-                              description
-                                ? 'text-cyan-600 hover:bg-cyan-50 cursor-pointer'
-                                : 'text-slate-300 cursor-not-allowed'
+                              description ? 'text-cyan-600 hover:bg-cyan-50 cursor-pointer' : 'text-slate-300 cursor-not-allowed'
                             }`}>
                             <Eye className="w-3 h-3" />
-                            {description ? 'View Description' : 'No Description'}
+                            {description ? 'View' : 'None'}
                           </button>
                         </td>
-                        <td className="py-2.5 text-right font-medium text-red-600">₹{Number(amount).toLocaleString()}</td>
+                        <td className="py-2.5 text-right font-medium text-red-600">रु{Number(amount).toLocaleString()}</td>
                         <td className="py-2.5 text-center">
-                          <button onClick={() => setDeleteTarget(e)}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
+                          <button onClick={() => handleEdit(e)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setDeleteTarget(e)} className="p-1 text-red-500 hover:bg-red-50 rounded ml-1" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
@@ -196,15 +225,14 @@ export default function Expenses() {
             <h3 className="text-lg font-bold text-slate-800 mb-4">Expense Details</h3>
             <div className="space-y-3 text-sm">
               <div><span className="text-slate-500">Name:</span> <span className="font-medium ml-2">{viewDetails.expense_name || viewDetails.reason}</span></div>
-              <div><span className="text-slate-500">Amount:</span> <span className="font-medium ml-2 text-red-600">₹{Number(viewDetails.expense_amount || viewDetails.amount).toLocaleString()}</span></div>
+              <div><span className="text-slate-500">Amount:</span> <span className="font-medium ml-2 text-red-600">रु{Number(viewDetails.expense_amount || viewDetails.amount).toLocaleString()}</span></div>
+              <div><span className="text-slate-500">Method:</span> <span className="font-medium ml-2">{viewDetails.payment_method || '—'}</span></div>
               <div><span className="text-slate-500">Date:</span> <span className="font-medium ml-2">{viewDetails.expense_date}</span></div>
               <div><span className="text-slate-500">Description:</span></div>
               <div className="bg-slate-50 rounded-lg p-3 text-slate-700 whitespace-pre-wrap">{viewDetails.expense_description || 'No description'}</div>
             </div>
             <button onClick={() => setViewDetails(null)}
-              className="mt-4 w-full py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium">
-              Close
-            </button>
+              className="mt-4 w-full py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium">Close</button>
           </div>
         </div>
       )}
@@ -213,7 +241,7 @@ export default function Expenses() {
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        itemName={`Expense: ₹{deleteTarget?.expense_amount || deleteTarget?.amount || 0} — ${deleteTarget?.expense_name || deleteTarget?.reason || ''}`}
+        itemName={`Expense: रु${deleteTarget?.expense_amount || deleteTarget?.amount || 0} — ${deleteTarget?.expense_name || deleteTarget?.reason || ''}`}
       />
     </div>
   )
